@@ -36,7 +36,7 @@
 #define C 112.69f
 
 #define PID_FAN_CYCLE_MAX 1000
-#define PID_FAN_CYCLE_MIN 0
+#define PID_FAN_CYCLE_MIN 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -107,6 +107,25 @@ void FanPIDRegulator()
 
 	errCur = temp - targetTemp;
 
+  if ( (((Ki*errInteg)<=PID_FAN_CYCLE_MAX) && (errCur >=0)) || (((Ki*errInteg)>=PID_FAN_CYCLE_MIN) && (errCur < 0)) )
+  {
+    errInteg += errCur*timeCountSec;
+  }
+  errDiff = (errCur - errPrev)/timeCountSec;
+  
+  pwmFAN = Kp*errCur + Ki*errCur + Kd*errCur;
+
+  if (pwmFAN < PID_FAN_CYCLE_MIN)
+  {
+    pwmFAN = PID_FAN_CYCLE_MIN;
+  }
+  if (pwmFAN > PID_FAN_CYCLE_MAX)
+  {
+    pwmFAN = PID_FAN_CYCLE_MAX;
+  }
+
+  errPrev = errCur;
+  timeCountMs = 0;
 
 }
 
@@ -153,7 +172,7 @@ int main(void)
 
   HAL_TIM_PWM_Start_IT(&htim3,TIM_CHANNEL_4);
 
-  TIM3->CCR4=100;
+  TIM3->CCR4=PID_FAN_CYCLE_MIN;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -164,6 +183,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  TempMeasure();
+    FanPIDRegulator();
 	  //HAL_Delay(1000);
   }
   /* USER CODE END 3 */
@@ -413,6 +433,11 @@ void HAL_TIM_PeriodElapseedCallback(TIM_HandleTypeDef *htim)
 	{
 		sch_100ms = 255;
 	}
+  if (htim->Instance == TIM3)
+  {
+    TIM3->CCR4 = (uint16_t)pwmFAN;
+    ++timeCountMs;
+  }
 }
 /* USER CODE END 4 */
 
