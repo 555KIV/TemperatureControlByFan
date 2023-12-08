@@ -50,6 +50,7 @@ DMA_HandleTypeDef hdma_adc1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
 
@@ -62,8 +63,9 @@ static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
-
+void ledprint(uint16_t);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -71,7 +73,7 @@ static void MX_TIM3_Init(void);
 float pwmFAN = 100;
 float targetTemp = 20;
 
-float Kp = 0;
+float Kp = 5;
 float Ki = 0;
 float Kd = 0;
 
@@ -95,7 +97,7 @@ void TempMeasure()
 		temp = A*ADC_raw[0]*ADC_raw[0];
 		temp+= B*ADC_raw[0];
 		temp-= C;
-
+		ledprint((uint8_t)temp);
 
 		sch_100ms = 0;
 	}
@@ -107,25 +109,141 @@ void FanPIDRegulator()
 
 	errCur = temp - targetTemp;
 
-  if ( (((Ki*errInteg)<=PID_FAN_CYCLE_MAX) && (errCur >=0)) || (((Ki*errInteg)>=PID_FAN_CYCLE_MIN) && (errCur < 0)) )
-  {
-    errInteg += errCur*timeCountSec;
-  }
-  errDiff = (errCur - errPrev)/timeCountSec;
+	if ( (((Ki*errInteg)<=PID_FAN_CYCLE_MAX) && (errCur >=0)) || (((Ki*errInteg)>=PID_FAN_CYCLE_MIN) && (errCur < 0)) )
+	{
+		errInteg += errCur*timeCountSec;
+	}
+
+	errDiff = (errCur - errPrev)/timeCountSec;
+
   
-  pwmFAN = Kp*errCur + Ki*errCur + Kd*errCur;
+	pwmFAN = Kp*errCur + Ki*errCur + Kd*errCur;
 
-  if (pwmFAN < PID_FAN_CYCLE_MIN)
-  {
-    pwmFAN = PID_FAN_CYCLE_MIN;
-  }
-  if (pwmFAN > PID_FAN_CYCLE_MAX)
-  {
-    pwmFAN = PID_FAN_CYCLE_MAX;
-  }
+	if (pwmFAN < PID_FAN_CYCLE_MIN)
+	{
+		pwmFAN = PID_FAN_CYCLE_MIN;
+	}
+	if (pwmFAN > PID_FAN_CYCLE_MAX)
+	{
+		pwmFAN = PID_FAN_CYCLE_MAX;
+	}
 
-  errPrev = errCur;
-  timeCountMs = 0;
+	errPrev = errCur;
+	timeCountMs = 0;
+
+}
+
+uint8_t R1 = 255, R2 = 0, R3 = 0;
+
+uint16_t count_encoder = 0;
+
+void setnumber(uint8_t number)
+{
+	switch (number)
+	{
+	case 255:
+			HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_SET);
+			break;
+	case 1:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_SET);
+		break;
+	case 2:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+	case 3:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+
+	case 4:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+	case 5:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+	case 6:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+	case 7:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_SET);
+		break;
+	case 8:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+	case 9:
+		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
+		break;
+	}
+
+}
+
+
+void ledprint(uint16_t num)
+{
+	R3 = num%10;
+	R2 = (num%100)/10;
+	R1 = num/100;
+	if (R1 == 0)
+		R1=255;
 
 }
 
@@ -163,6 +281,7 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADCEx_Calibration_Start(&hadc1);
 
@@ -170,9 +289,18 @@ int main(void)
 
   HAL_TIM_Base_Start_IT(&htim2);
 
+
+
   HAL_TIM_PWM_Start_IT(&htim3,TIM_CHANNEL_4);
 
-  TIM3->CCR4=PID_FAN_CYCLE_MIN;
+  //TIM3->CCR4=PID_FAN_CYCLE_MIN;
+
+  HAL_GPIO_WritePin(GPIOB,HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin|HL_E_Pin|HL_F_Pin|HL_G_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC,HL_Switch1_Pin|HL_Switch2_Pin|HL_Switch3_Pin,GPIO_PIN_RESET);
+
+  HAL_TIM_Base_Start_IT(&htim6);
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -183,8 +311,11 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  TempMeasure();
-    FanPIDRegulator();
-	  //HAL_Delay(1000);
+
+	  //FanPIDRegulator();
+	  //ledprint(123);
+
+
   }
   /* USER CODE END 3 */
 }
@@ -393,6 +524,44 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 8000-1;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 20;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -415,29 +584,54 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin|HL_Switch2_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin
+                          |HL_E_Pin|HL_F_Pin|HL_G_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : HL_Switch1_Pin HL_Switch2_Pin HL_Switch3_Pin */
+  GPIO_InitStruct.Pin = HL_Switch1_Pin|HL_Switch2_Pin|HL_Switch3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : HL_A_Pin HL_B_Pin HL_C_Pin HL_D_Pin
+                           HL_E_Pin HL_F_Pin HL_G_Pin */
+  GPIO_InitStruct.Pin = HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin
+                          |HL_E_Pin|HL_F_Pin|HL_G_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapseedCallback(TIM_HandleTypeDef *htim)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM2)
 	{
 		sch_100ms = 255;
 	}
-  if (htim->Instance == TIM3)
-  {
-    TIM3->CCR4 = (uint16_t)pwmFAN;
-    ++timeCountMs;
-  }
+	if (htim->Instance == TIM3)
+	{
+		TIM3->CCR4 = (uint16_t)pwmFAN;
+		++timeCountMs;
+	}
 }
 /* USER CODE END 4 */
 

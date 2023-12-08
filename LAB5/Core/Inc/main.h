@@ -55,14 +55,34 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void setnumber(uint8_t);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define HL_Switch1_Pin GPIO_PIN_13
+#define HL_Switch1_GPIO_Port GPIOC
+#define HL_Switch2_Pin GPIO_PIN_14
+#define HL_Switch2_GPIO_Port GPIOC
+#define HL_Switch3_Pin GPIO_PIN_15
+#define HL_Switch3_GPIO_Port GPIOC
 #define T_SENSOR_Pin GPIO_PIN_0
 #define T_SENSOR_GPIO_Port GPIOA
 #define FAN_PWM_Pin GPIO_PIN_1
 #define FAN_PWM_GPIO_Port GPIOB
+#define HL_A_Pin GPIO_PIN_3
+#define HL_A_GPIO_Port GPIOB
+#define HL_B_Pin GPIO_PIN_4
+#define HL_B_GPIO_Port GPIOB
+#define HL_C_Pin GPIO_PIN_5
+#define HL_C_GPIO_Port GPIOB
+#define HL_D_Pin GPIO_PIN_6
+#define HL_D_GPIO_Port GPIOB
+#define HL_E_Pin GPIO_PIN_7
+#define HL_E_GPIO_Port GPIOB
+#define HL_F_Pin GPIO_PIN_8
+#define HL_F_GPIO_Port GPIOB
+#define HL_G_Pin GPIO_PIN_9
+#define HL_G_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
