@@ -60,8 +60,11 @@ extern DMA_HandleTypeDef hdma_adc1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim6;
+extern TIM_HandleTypeDef htim14;
 /* USER CODE BEGIN EV */
 extern uint8_t R1, R2, R3;
+extern uint8_t flagDot[3];
+uint8_t n_count = 0;
 //uint8_t n_count = 0;
 /* USER CODE END EV */
 
@@ -146,6 +149,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles EXTI line 4 to 15 interrupts.
+  */
+void EXTI4_15_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI4_15_IRQn 0 */
+
+  /* USER CODE END EXTI4_15_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(EN_SW_Pin);
+  /* USER CODE BEGIN EXTI4_15_IRQn 1 */
+
+  /* USER CODE END EXTI4_15_IRQn 1 */
+}
+
+/**
   * @brief This function handles DMA1 channel 1 interrupt.
   */
 void DMA1_Channel1_IRQHandler(void)
@@ -196,35 +213,48 @@ void TIM3_IRQHandler(void)
 /**
   * @brief This function handles TIM6, DAC1 and LPTIM1 interrupts (LPTIM1 interrupt through EXTI line 29).
   */
-uint8_t n_count = 0;
 void TIM6_DAC_LPTIM1_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_LPTIM1_IRQn 0 */
 	if(n_count==0)
 	{
-		                HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin,        GPIO_PIN_SET);
-		                HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
-		                setnumber(R1);
+		  HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin,        GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+		  SetNumber(R3,flagDot[0]);
 	}
 	if(n_count==1)
 	{
-		                HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin,        GPIO_PIN_SET);
-		                HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
-		                setnumber(R2);
+		  HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin,        GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+		  SetNumber(R2,flagDot[1]);
 	}
-	   if(n_count==2)
+	if(n_count==2)
 	{
-		                HAL_GPIO_WritePin(GPIOC, HL_Switch3_Pin,        GPIO_PIN_SET);
-				                HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch1_Pin, GPIO_PIN_RESET);
-				                setnumber(R3);
-				        }
-			    n_count++;
-			    if (n_count>2) n_count=0;
+		  HAL_GPIO_WritePin(GPIOC, HL_Switch3_Pin,        GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch1_Pin, GPIO_PIN_RESET);
+		  SetNumber(R1,flagDot[2]);
+	}
+	n_count++;
+	if (n_count>2) n_count=0;
   /* USER CODE END TIM6_DAC_LPTIM1_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_LPTIM1_IRQn 1 */
 
   /* USER CODE END TIM6_DAC_LPTIM1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM14 global interrupt.
+  */
+void TIM14_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM14_IRQn 0 */
+
+  /* USER CODE END TIM14_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim14);
+  /* USER CODE BEGIN TIM14_IRQn 1 */
+
+  /* USER CODE END TIM14_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

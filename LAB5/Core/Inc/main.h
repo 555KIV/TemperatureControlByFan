@@ -55,7 +55,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void setnumber(uint8_t);
+void SetNumber(uint8_t, uint8_t);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -67,8 +67,17 @@ void setnumber(uint8_t);
 #define HL_Switch3_GPIO_Port GPIOC
 #define T_SENSOR_Pin GPIO_PIN_0
 #define T_SENSOR_GPIO_Port GPIOA
+#define EN_SW_Pin GPIO_PIN_5
+#define EN_SW_GPIO_Port GPIOA
+#define EN_SW_EXTI_IRQn EXTI4_15_IRQn
+#define EN_A_Pin GPIO_PIN_6
+#define EN_A_GPIO_Port GPIOA
+#define EN_B_Pin GPIO_PIN_7
+#define EN_B_GPIO_Port GPIOA
 #define FAN_PWM_Pin GPIO_PIN_1
 #define FAN_PWM_GPIO_Port GPIOB
+#define HL_DP_Pin GPIO_PIN_15
+#define HL_DP_GPIO_Port GPIOA
 #define HL_A_Pin GPIO_PIN_3
 #define HL_A_GPIO_Port GPIOB
 #define HL_B_Pin GPIO_PIN_4

@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "filter_sma.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,6 +37,9 @@
 
 #define PID_FAN_CYCLE_MAX 1000
 #define PID_FAN_CYCLE_MIN 100
+
+#define MENU_POS_MAX 2
+#define MENU_POS_MIN 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,6 +54,7 @@ DMA_HandleTypeDef hdma_adc1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
+TIM_HandleTypeDef htim14;
 
 /* USER CODE BEGIN PV */
 
@@ -64,12 +68,16 @@ static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_TIM14_Init(void);
 /* USER CODE BEGIN PFP */
-void ledprint(uint16_t);
+void LedPrint();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+//---------------------------
 float pwmFAN = 100;
 float targetTemp = 20;
 
@@ -84,23 +92,58 @@ float errDiff = 0;
 
 uint32_t timeCountMs = 0;
 
+//----------------------------
 
 uint16_t ADC_raw[1];
 float temp = 0;
 uint8_t sch_100ms = 255;
 
+//----------------------------
+
+uint8_t R1 = 0, R2 = 0, R3 = 0;
+
+uint8_t segmentNumber[11]={
+		0x3f, // 0
+		0x06, // 1
+		0x5b, // 2
+		0x4f, // 3
+		0x66, // 4
+		0x6d, // 5
+		0x7d, // 6
+		0x07, // 7
+		0x7f, // 8
+		0x67, // 9
+		0x40  // -
+};
+
+
+
+//------------------------------
+
+uint32_t prevCounter = 0;
+
+
+uint8_t posMenu = 1;
+uint8_t flagMenu = 0;
+uint8_t flagDot[3] = {0,0,0};
+
+//------------------------------
+
 void TempMeasure()
 {
-	if (sch_100ms)
-	{
-		HAL_ADC_Start_IT(&hadc1);
-		temp = A*ADC_raw[0]*ADC_raw[0];
-		temp+= B*ADC_raw[0];
-		temp-= C;
-		ledprint((uint8_t)temp);
+	uint16_t buf = 0;
 
-		sch_100ms = 0;
-	}
+	HAL_ADC_Start_IT(&hadc1);
+	buf = ADC_raw[0];
+	//buf = Filter_Sma(ADC_raw[0]);
+	temp = A*buf*buf;
+	temp+= B*buf;
+	temp-= C;
+	temp*=10;
+	//LedPrint((uint8_t)temp);
+
+	sch_100ms = 0;
+
 }
 
 void FanPIDRegulator()
@@ -133,118 +176,79 @@ void FanPIDRegulator()
 
 }
 
-uint8_t R1 = 255, R2 = 0, R3 = 0;
 
-uint16_t count_encoder = 0;
-
-void setnumber(uint8_t number)
+void SetNumber(uint8_t number, uint8_t flag)
 {
-	switch (number)
-	{
-	case 255:
-			HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_SET);
-			break;
-	case 1:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_SET);
-		break;
-	case 2:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
-	case 3:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
+	number = segmentNumber[number];
 
-	case 4:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
-	case 5:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
-	case 6:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
-	case 7:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_SET);
-		break;
-	case 8:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
-	case 9:
-		HAL_GPIO_WritePin(GPIOB, HL_A_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_B_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_C_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_D_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_E_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, HL_F_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, HL_G_Pin, GPIO_PIN_RESET);
-		break;
+	HAL_GPIO_WritePin(GPIOB, HL_A_Pin, ((number>>0)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_B_Pin, ((number>>1)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_C_Pin, ((number>>2)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_D_Pin, ((number>>3)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_E_Pin, ((number>>4)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_F_Pin, ((number>>5)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_G_Pin, ((number>>6)&0x01));
+	HAL_GPIO_WritePin(GPIOA,HL_DP_Pin, flag ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+}
+
+
+void LedPrint()
+{
+	if (flagMenu)
+	{
+		R3 = 10; // symbol = '-'
+		R1 = 10;
+		R2 = posMenu;
+	}
+	switch (posMenu)
+	{
+		case 1:
+		{
+			uint16_t num = temp;
+			R1 = num%10;
+			R2 = (num%100)/10;
+			R3 = num/100;
+			flagDot[1] = 1;
+			break;
+		}
+		case 2:
+		{
+			uint16_t buf = TIM14->CCR1;
+			R1 = buf%10;
+			R2 = (buf%100)/10;
+			R3 = buf/100;
+			flagDot[1] = 0;
+			break;
+		}
 	}
 
 }
 
 
-void ledprint(uint16_t num)
-{
-	R3 = num%10;
-	R2 = (num%100)/10;
-	R1 = num/100;
-	if (R1 == 0)
-		R1=255;
 
+void Encoder()
+{
+	uint32_t currCounter = __HAL_TIM_GET_COUNTER(&htim3);
+	currCounter = 32767 - ((currCounter-1)&0xFFFF)/2;
+	if (currCounter > 32768/2)
+	{
+		currCounter = currCounter - 32768;
+	}
+	if (currCounter != prevCounter)
+	{
+		uint32_t delta = currCounter - prevCounter;
+		prevCounter = currCounter;
+		if (delta>10)
+		{
+			posMenu = (posMenu > MENU_POS_MAX) ? MENU_POS_MAX : posMenu+1;
+		}
+		if (delta<-10)
+		{
+			posMenu = posMenu < MENU_POS_MIN ? MENU_POS_MIN : posMenu-1;
+		}
+		flagMenu = 1;
+	}
 }
 
 /* USER CODE END 0 */
@@ -282,6 +286,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM6_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADCEx_Calibration_Start(&hadc1);
 
@@ -289,13 +294,14 @@ int main(void)
 
   HAL_TIM_Base_Start_IT(&htim2);
 
+  HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
 
+  HAL_TIM_PWM_Start_IT(&htim14,TIM_CHANNEL_1);
 
-  HAL_TIM_PWM_Start_IT(&htim3,TIM_CHANNEL_4);
-
-  //TIM3->CCR4=PID_FAN_CYCLE_MIN;
+  //TIM14->CCR1=PID_FAN_CYCLE_MIN;
 
   HAL_GPIO_WritePin(GPIOB,HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin|HL_E_Pin|HL_F_Pin|HL_G_Pin,GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA,HL_DP_Pin,GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOC,HL_Switch1_Pin|HL_Switch2_Pin|HL_Switch3_Pin,GPIO_PIN_RESET);
 
   HAL_TIM_Base_Start_IT(&htim6);
@@ -310,10 +316,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  TempMeasure();
-
+	  if (sch_100ms)
+	  	{
+		  TempMeasure();
+	  	}
 	  //FanPIDRegulator();
-	  //ledprint(123);
+	  //LedPrint(123);
+	  Encoder();
 
 
   }
@@ -476,29 +485,28 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 0 */
 
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_Encoder_InitTypeDef sConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM3_Init 1 */
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 16-1;
+  htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1000-1;
+  htim3.Init.Period = 65535;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 0;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 0;
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -508,18 +516,9 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
 
 }
 
@@ -562,6 +561,52 @@ static void MX_TIM6_Init(void)
 }
 
 /**
+  * @brief TIM14 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM14_Init(void)
+{
+
+  /* USER CODE BEGIN TIM14_Init 0 */
+
+  /* USER CODE END TIM14_Init 0 */
+
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM14_Init 1 */
+
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 16-1;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = 1000-1;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim14) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim14, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
+
+  /* USER CODE END TIM14_Init 2 */
+  HAL_TIM_MspPostInit(&htim14);
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -597,6 +642,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin|HL_Switch2_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(HL_DP_GPIO_Port, HL_DP_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin
                           |HL_E_Pin|HL_F_Pin|HL_G_Pin, GPIO_PIN_RESET);
 
@@ -607,6 +655,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : EN_SW_Pin */
+  GPIO_InitStruct.Pin = EN_SW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(EN_SW_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : HL_DP_Pin */
+  GPIO_InitStruct.Pin = HL_DP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(HL_DP_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pins : HL_A_Pin HL_B_Pin HL_C_Pin HL_D_Pin
                            HL_E_Pin HL_F_Pin HL_G_Pin */
   GPIO_InitStruct.Pin = HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin
@@ -615,6 +676,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -627,12 +692,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		sch_100ms = 255;
 	}
-	if (htim->Instance == TIM3)
+	if (htim->Instance == TIM14)
 	{
-		TIM3->CCR4 = (uint16_t)pwmFAN;
+		TIM14->CCR1 = (uint16_t)pwmFAN;
 		++timeCountMs;
 	}
 }
+
+void HAL_GPIO_EXIT_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == EN_SW_Pin)
+	{
+		flagMenu = 0;
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
