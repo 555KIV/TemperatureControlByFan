@@ -10,6 +10,8 @@
 
 uint16_t Filter_Sma(uint16_t For_Filtered);
 uint16_t Filter_Exp(uint16_t For_Filtered);
+uint16_t Filter_RAA(uint16_t For_Filtered);
+
 
 #ifndef INC_FILTE_SMA_H_
 #define INC_FILTE_SMA_H_

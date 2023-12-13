@@ -39,3 +39,15 @@ uint16_t Filter_Exp(uint16_t For_filtered)
 	return y;
 }
 
+const float FILTER_COEFFICIENT = 0.1;
+const float FILTER_COEFFICIENT_ADAPTIVE = 0.8;
+const uint16_t FILTER_VALUE_DIFF = 2;
+uint16_t filterValue = 0;
+
+uint16_t Filter_RAA(uint16_t For_Filtered)
+{
+	float coeff = (abs(For_Filtered-filterValue)>FILTER_VALUE_DIFF)?FILTER_COEFFICIENT_ADAPTIVE:FILTER_COEFFICIENT;
+	filterValue += (For_Filtered-filterValue)*coeff;
+	return filterValue;
+}
+

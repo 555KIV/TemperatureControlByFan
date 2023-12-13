@@ -36,7 +36,8 @@
 #define C 112.69f
 
 #define PID_FAN_CYCLE_MAX 1000
-#define PID_FAN_CYCLE_MIN 100
+#define PID_FAN_CYCLE_MIN 50
+#define PID_FAN_CYCLE_START 100
 
 #define MENU_POS_MAX 2
 #define MENU_POS_MIN 1
@@ -79,9 +80,9 @@ void LedPrint();
 
 //---------------------------
 float pwmFAN = 100;
-float targetTemp = 20;
+float targetTemp = 15;
 
-float Kp = 5;
+float Kp = 50;
 float Ki = 0;
 float Kd = 0;
 
@@ -102,7 +103,7 @@ uint8_t sch_100ms = 255;
 
 uint8_t R1 = 0, R2 = 0, R3 = 0;
 
-uint8_t segmentNumber[11]={
+uint8_t segmentNumber[12]={
 		0x3f, // 0
 		0x06, // 1
 		0x5b, // 2
@@ -113,7 +114,8 @@ uint8_t segmentNumber[11]={
 		0x07, // 7
 		0x7f, // 8
 		0x67, // 9
-		0x40  // -
+		0x40, // -
+		0x00 // off
 };
 
 
@@ -127,7 +129,11 @@ uint8_t posMenu = 1;
 uint8_t flagMenu = 0;
 uint8_t flagDot[3] = {0,0,0};
 
+
+
 //------------------------------
+
+
 
 void TempMeasure()
 {
@@ -135,7 +141,8 @@ void TempMeasure()
 
 	HAL_ADC_Start_IT(&hadc1);
 	buf = ADC_raw[0];
-	//buf = Filter_Sma(ADC_raw[0]);
+	buf = Filter_Sma(ADC_raw[0]);
+	//buf = Filter_RAA(ADC_raw[0]);
 	temp = A*buf*buf;
 	temp+= B*buf;
 	temp-= C;
@@ -150,7 +157,7 @@ void FanPIDRegulator()
 {
 	float timeCountSec = (float)timeCountMs / 1000;
 
-	errCur = temp - targetTemp;
+	errCur = (temp/10) - targetTemp;
 
 	if ( (((Ki*errInteg)<=PID_FAN_CYCLE_MAX) && (errCur >=0)) || (((Ki*errInteg)>=PID_FAN_CYCLE_MIN) && (errCur < 0)) )
 	{
@@ -171,6 +178,8 @@ void FanPIDRegulator()
 		pwmFAN = PID_FAN_CYCLE_MAX;
 	}
 
+	//TIM14->CCR1 = pwmFAN;
+	TIM14->CCR1 = (uint16_t)pwmFAN;
 	errPrev = errCur;
 	timeCountMs = 0;
 
@@ -181,25 +190,27 @@ void SetNumber(uint8_t number, uint8_t flag)
 {
 	number = segmentNumber[number];
 
-	HAL_GPIO_WritePin(GPIOB, HL_A_Pin, ((number>>0)&0x01));
-	HAL_GPIO_WritePin(GPIOB, HL_B_Pin, ((number>>1)&0x01));
-	HAL_GPIO_WritePin(GPIOB, HL_C_Pin, ((number>>2)&0x01));
-	HAL_GPIO_WritePin(GPIOB, HL_D_Pin, ((number>>3)&0x01));
-	HAL_GPIO_WritePin(GPIOB, HL_E_Pin, ((number>>4)&0x01));
-	HAL_GPIO_WritePin(GPIOB, HL_F_Pin, ((number>>5)&0x01));
-	HAL_GPIO_WritePin(GPIOB, HL_G_Pin, ((number>>6)&0x01));
-	HAL_GPIO_WritePin(GPIOA,HL_DP_Pin, flag ? GPIO_PIN_SET : GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, HL_A_Pin, !((number>>0)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_B_Pin, !((number>>1)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_C_Pin, !((number>>2)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_D_Pin, !((number>>3)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_E_Pin, !((number>>4)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_F_Pin, !((number>>5)&0x01));
+	HAL_GPIO_WritePin(GPIOB, HL_G_Pin, !((number>>6)&0x01));
+	HAL_GPIO_WritePin(GPIOA,HL_DP_Pin, flag==1 ? GPIO_PIN_RESET : GPIO_PIN_SET);
 
 }
 
 
 void LedPrint()
 {
-	if (flagMenu)
+	if (flagMenu == 1)
 	{
 		R3 = 10; // symbol = '-'
 		R1 = 10;
 		R2 = posMenu;
+		flagDot[1] = 0;
+		return;
 	}
 	switch (posMenu)
 	{
@@ -214,10 +225,16 @@ void LedPrint()
 		}
 		case 2:
 		{
-			uint16_t buf = TIM14->CCR1;
+			uint16_t buf = TIM14->CCR1 / 10;
 			R1 = buf%10;
-			R2 = (buf%100)/10;
-			R3 = buf/100;
+			if (buf<10)
+				R2 = 11;
+			else
+				R2 = (buf%100)/10;
+			if (buf/100 == 0)
+				R3 = 11;
+			else
+				R3 = buf/100;
 			flagDot[1] = 0;
 			break;
 		}
@@ -241,11 +258,11 @@ void Encoder()
 		prevCounter = currCounter;
 		if (delta>10)
 		{
-			posMenu = (posMenu > MENU_POS_MAX) ? MENU_POS_MAX : posMenu+1;
+			posMenu = (posMenu >= MENU_POS_MAX) ? MENU_POS_MAX : posMenu+1;
 		}
 		if (delta<-10)
 		{
-			posMenu = posMenu < MENU_POS_MIN ? MENU_POS_MIN : posMenu-1;
+			posMenu = posMenu <= MENU_POS_MIN ? MENU_POS_MIN : posMenu-1;
 		}
 		flagMenu = 1;
 	}
@@ -298,7 +315,7 @@ int main(void)
 
   HAL_TIM_PWM_Start_IT(&htim14,TIM_CHANNEL_1);
 
-  //TIM14->CCR1=PID_FAN_CYCLE_MIN;
+  TIM14->CCR1=PID_FAN_CYCLE_START;
 
   HAL_GPIO_WritePin(GPIOB,HL_A_Pin|HL_B_Pin|HL_C_Pin|HL_D_Pin|HL_E_Pin|HL_F_Pin|HL_G_Pin,GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOA,HL_DP_Pin,GPIO_PIN_SET);
@@ -320,9 +337,10 @@ int main(void)
 	  	{
 		  TempMeasure();
 	  	}
-	  //FanPIDRegulator();
+	  FanPIDRegulator();
 	  //LedPrint(123);
 	  Encoder();
+	  LedPrint();
 
 
   }
@@ -542,7 +560,7 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 8000-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 20;
+  htim6.Init.Period = 10;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -657,8 +675,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : EN_SW_Pin */
   GPIO_InitStruct.Pin = EN_SW_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(EN_SW_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : HL_DP_Pin */
@@ -699,12 +717,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
-void HAL_GPIO_EXIT_Callback(uint16_t GPIO_Pin)
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if (GPIO_Pin == EN_SW_Pin)
-	{
-		flagMenu = 0;
-	}
+
 }
 
 /* USER CODE END 4 */

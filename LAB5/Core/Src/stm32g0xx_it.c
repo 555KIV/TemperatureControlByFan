@@ -64,7 +64,12 @@ extern TIM_HandleTypeDef htim14;
 /* USER CODE BEGIN EV */
 extern uint8_t R1, R2, R3;
 extern uint8_t flagDot[3];
+volatile static uint32_t lastPress = 0;
+extern uint8_t flagMenu;
 uint8_t n_count = 0;
+
+
+
 //uint8_t n_count = 0;
 /* USER CODE END EV */
 
@@ -154,6 +159,21 @@ void SysTick_Handler(void)
 void EXTI4_15_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI4_15_IRQn 0 */
+	uint32_t buf = HAL_GetTick();
+	uint16_t flag = 1;
+
+	if (buf - lastPress<200)
+	{
+		flag=0;
+	}
+
+	if (flag==1)
+	{
+			flagMenu = 0;
+
+			lastPress = buf;
+	}
+
 
   /* USER CODE END EXTI4_15_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(EN_SW_Pin);
@@ -218,21 +238,27 @@ void TIM6_DAC_LPTIM1_IRQHandler(void)
   /* USER CODE BEGIN TIM6_DAC_LPTIM1_IRQn 0 */
 	if(n_count==0)
 	{
+		HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+		SetNumber(11,0);
 		  HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin,        GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+
 		  SetNumber(R3,flagDot[0]);
 	}
 	if(n_count==1)
 	{
+		HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+		SetNumber(11,0);
 		  HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin,        GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(GPIOC, HL_Switch1_Pin|HL_Switch3_Pin, GPIO_PIN_RESET);
+
 		  SetNumber(R2,flagDot[1]);
 	}
 	if(n_count==2)
 	{
-		  HAL_GPIO_WritePin(GPIOC, HL_Switch3_Pin,        GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch1_Pin, GPIO_PIN_RESET);
-		  SetNumber(R1,flagDot[2]);
+		HAL_GPIO_WritePin(GPIOC, HL_Switch2_Pin|HL_Switch1_Pin, GPIO_PIN_RESET);
+		SetNumber(11,0);
+		HAL_GPIO_WritePin(GPIOC, HL_Switch3_Pin,        GPIO_PIN_SET);
+
+		SetNumber(R1,flagDot[2]);
 	}
 	n_count++;
 	if (n_count>2) n_count=0;
