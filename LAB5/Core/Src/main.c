@@ -39,7 +39,7 @@
 #define PID_FAN_CYCLE_MIN 50
 #define PID_FAN_CYCLE_START 100
 
-#define MENU_POS_MAX 2
+#define MENU_POS_MAX 5
 #define MENU_POS_MIN 1
 /* USER CODE END PD */
 
@@ -56,6 +56,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim14;
+TIM_HandleTypeDef htim17;
 
 /* USER CODE BEGIN PV */
 
@@ -70,6 +71,7 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM14_Init(void);
+static void MX_TIM17_Init(void);
 /* USER CODE BEGIN PFP */
 void LedPrint();
 /* USER CODE END PFP */
@@ -81,10 +83,13 @@ void LedPrint();
 //---------------------------
 float pwmFAN = 100;
 float targetTemp = 15;
+float targetTempEncoder = 15;
 
 float Kp = 50;
 float Ki = 0;
 float Kd = 0;
+
+int16_t KEncoder = 0;
 
 float errPrev = 0;
 float errCur = 0;
@@ -103,7 +108,7 @@ uint8_t sch_100ms = 255;
 
 uint8_t R1 = 0, R2 = 0, R3 = 0;
 
-uint8_t segmentNumber[12]={
+uint8_t segmentNumber[]={
 		0x3f, // 0
 		0x06, // 1
 		0x5b, // 2
@@ -114,8 +119,14 @@ uint8_t segmentNumber[12]={
 		0x07, // 7
 		0x7f, // 8
 		0x67, // 9
-		0x40, // -
-		0x00 // off
+		0x40, // - (10)
+		0x00, // off (11)
+		0x6d, // S (12)
+		0x77, // A (13)
+		0x3e, // V - U (14)
+		0x73, // p (15)
+		0x5e, // d	(16)
+		0x30 // I (17)
 };
 
 
@@ -126,7 +137,10 @@ uint32_t prevCounter = 0;
 
 
 uint8_t posMenu = 1;
+uint8_t posMenuPID_Edit = 1;
 uint8_t flagMenu = 0;
+uint8_t flagMenuEditHidden = 0;
+uint8_t flagMenuEditPID = 0;
 uint8_t flagDot[3] = {0,0,0};
 
 
@@ -201,6 +215,108 @@ void SetNumber(uint8_t number, uint8_t flag)
 
 }
 
+void SaveSetting()
+{
+
+}
+
+void RecordKEncoder()
+{
+	switch (posMenuPID_Edit)
+		{
+			case 1:
+			{
+				KEncoder = (int16_t)Kp;
+				break;
+			}
+			case 2:
+			{
+				KEncoder = (int16_t)Ki;
+				break;
+			}
+			case 3:
+			{
+				KEncoder = (int16_t)Kd;
+				break;
+			}
+		}
+}
+
+void ApplyPIDSetting()
+{
+	switch (posMenuPID_Edit)
+	{
+		case 1:
+		{
+			Kp = KEncoder;
+			break;
+		}
+		case 2:
+		{
+			Ki = KEncoder;
+			break;
+		}
+		case 3:
+		{
+			Kd = KEncoder;
+			break;
+		}
+	}
+}
+
+void EnterButton()
+{
+	if (flagMenu == 1)
+	{
+		flagMenu = 0;
+		if (posMenu == 3)
+		{
+			flagMenuEditHidden = 0;
+			HAL_TIM_Base_Start_IT(&htim17);
+		}
+		return;
+	}
+	if (flagMenuEditPID == 1)
+	{
+		ApplyPIDSetting();
+		HAL_TIM_Base_Stop_IT(&htim17);
+		flagMenuEditHidden = 0;
+		flagMenu = 1;
+		return;
+	}
+	switch (posMenu)
+	{
+		case 1:
+		{
+			break;
+		}
+		case 2:
+		{
+			break;
+		}
+		case 3:
+		{
+			HAL_TIM_Base_Stop_IT(&htim17);
+			flagMenuEditHidden = 0;
+			flagMenu = 1;
+			targetTemp = targetTempEncoder;
+			break;
+		}
+		case 4:
+		{
+			RecordKEncoder();
+			HAL_TIM_Base_Start_IT(&htim17);
+			flagMenuEditPID = 1;
+			break;
+		}
+		case 5:
+		{
+			SaveSetting();
+			flagMenu = 1;
+		}
+	}
+
+}
 
 void LedPrint()
 {
@@ -212,6 +328,47 @@ void LedPrint()
 		flagDot[1] = 0;
 		return;
 	}
+	if (flagMenuEditHidden == 1)
+	{
+		R1 = 11;
+		R2 = 11;
+		R3 = 11;
+		flagDot[1] = 0;
+		return;
+	}
+	if (flagMenuEditPID == 1)
+	{
+		int16_t buf = KEncoder;
+		R1 = abs(buf%10);
+		if (buf < 0 && buf>-10)
+		{
+			R2 = 10;
+			R3 = 11;
+			return;
+		}
+		if (buf<0 && buf>-100)
+		{
+			R2 = abs(buf/10);
+			R3 = 10;
+			return;
+		}
+		if (buf<10)
+		{
+			R2 = 11;
+			R3 = 11;
+			return;
+		}
+		if (buf < 100)
+		{
+			R2 = (buf%100)/10;
+			R3 = 11;
+			return;
+		}
+		R2 = (buf%100)/10;
+		R3 = buf/100;
+		return;
+	}
+
 	switch (posMenu)
 	{
 		case 1:
@@ -238,6 +395,33 @@ void LedPrint()
 			flagDot[1] = 0;
 			break;
 		}
+		case 3:
+		{
+			uint16_t target = targetTempEncoder*10;
+			R1 = target%10;
+			R2 = (target%100)/10;
+			if (target<100)
+				R3 = 11;
+			else
+				R3 = target/100;
+			flagDot[1] = 1;
+			break;
+		}
+		case 4:
+		{
+			R1 = 11;
+			R3 = 11;
+
+			R2 = 14+posMenuPID_Edit;
+			break;
+		}
+		case 5:
+		{
+			R1 = 14;
+			R2 = 13;
+			R3 = 12;
+			break;
+		}
 	}
 
 }
@@ -258,10 +442,40 @@ void Encoder()
 		prevCounter = currCounter;
 		if (delta>10)
 		{
+			if (flagMenu == 0 && posMenu == 3)
+			{
+				targetTempEncoder = (targetTempEncoder >= 99.9) ? 99.9 : targetTempEncoder+0.1;
+				return;
+			}
+			if (flagMenu == 0 && posMenu == 4)
+			{
+				posMenuPID_Edit = (posMenuPID_Edit >= 3) ? 3 : posMenuPID_Edit+1;
+				return;
+			}
+			if (flagMenuEditPID == 1)
+			{
+				KEncoder = (KEncoder >= 999) ? 999 : KEncoder+1;
+				return;
+			}
 			posMenu = (posMenu >= MENU_POS_MAX) ? MENU_POS_MAX : posMenu+1;
 		}
 		if (delta<-10)
 		{
+			if (flagMenu == 0 && posMenu == 3)
+			{
+				targetTempEncoder = (targetTempEncoder <= 0) ? 0 : targetTempEncoder-0.1;
+				return;
+			}
+			if (flagMenu == 0 && posMenu == 4)
+			{
+				posMenuPID_Edit = (posMenuPID_Edit <= 1) ? 1 : posMenuPID_Edit-1;
+				return;
+			}
+			if (flagMenuEditPID == 1)
+			{
+				KEncoder = (KEncoder <= -99) ? -99 : KEncoder-1;
+				return;
+			}
 			posMenu = posMenu <= MENU_POS_MIN ? MENU_POS_MIN : posMenu-1;
 		}
 		flagMenu = 1;
@@ -304,6 +518,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM6_Init();
   MX_TIM14_Init();
+  MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADCEx_Calibration_Start(&hadc1);
 
@@ -338,7 +553,7 @@ int main(void)
 		  TempMeasure();
 	  	}
 	  FanPIDRegulator();
-	  //LedPrint(123);
+
 	  Encoder();
 	  LedPrint();
 
@@ -621,6 +836,38 @@ static void MX_TIM14_Init(void)
 
   /* USER CODE END TIM14_Init 2 */
   HAL_TIM_MspPostInit(&htim14);
+
+}
+
+/**
+  * @brief TIM17 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM17_Init(void)
+{
+
+  /* USER CODE BEGIN TIM17_Init 0 */
+
+  /* USER CODE END TIM17_Init 0 */
+
+  /* USER CODE BEGIN TIM17_Init 1 */
+
+  /* USER CODE END TIM17_Init 1 */
+  htim17.Instance = TIM17;
+  htim17.Init.Prescaler = 16000-1;
+  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim17.Init.Period = 65535;
+  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim17.Init.RepetitionCounter = 0;
+  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM17_Init 2 */
+
+  /* USER CODE END TIM17_Init 2 */
 
 }
 
