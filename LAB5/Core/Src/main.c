@@ -41,6 +41,10 @@
 
 #define MENU_POS_MAX 5
 #define MENU_POS_MIN 1
+
+#define NULL_FLASH 0xffffffff
+#define NUM_SETTING 4
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -147,7 +151,11 @@ uint8_t flagDot[3] = {0,0,0};
 
 //------------------------------
 
+const uint32_t flashAddress = 0x0801f800;
 
+
+
+//------------------------------
 
 void TempMeasure()
 {
@@ -215,8 +223,53 @@ void SetNumber(uint8_t number, uint8_t flag)
 
 }
 
+void LoadSetting()
+{
+	uint32_t address = flashAddress;
+	uint32_t data[NUM_SETTING] = {0,};
+
+	for(uint16_t i = 0;i<NUM_SETTING;i++)
+	{
+		uint32_t buf = *(uint32_t*)address;
+		if (buf != NULL_FLASH)
+		{
+			data[i] = buf;
+		}
+		address+=4;
+	}
+
+	targetTemp = (data[0]!=0)?data[0]:20;
+	Kp = (data[1]!=0)?data[1]:50;
+	Ki = (data[2]!=0)?data[2]:0;
+	Kd = (data[3]!=0)?data[3]:0;
+}
+
 void SaveSetting()
 {
+	static FLASH_EraseInitTypeDef EraseInitStruct;
+	EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+	//EraseInitStruct.Page = flashAddress;
+	EraseInitStruct.Page = FLASH_PAGE_NB-1;
+	EraseInitStruct.NbPages = 1;
+	uint32_t pageErr = 0;
+
+	HAL_FLASH_Unlock();
+
+	HAL_FLASHEx_Erase(&EraseInitStruct, &pageErr);
+
+
+	uint32_t address = flashAddress;
+	uint32_t data[NUM_SETTING] = {targetTemp,Kp,Ki,Kd};
+
+	for(uint16_t i = 0;i<NUM_SETTING;i++)
+	{
+		HAL_FLASH_Program(FLASH_TYPEPROGRAM_FAST,address, data[i]);
+
+		address +=4;
+	}
+
+	HAL_FLASH_Lock();
+
 
 }
 
@@ -311,7 +364,7 @@ void EnterButton()
 		}
 		case 5:
 		{
-			SaveSetting();
+			//SaveSetting();
 			flagMenu = 1;
 		}
 	}
@@ -376,7 +429,10 @@ void LedPrint()
 			uint16_t num = temp;
 			R1 = num%10;
 			R2 = (num%100)/10;
-			R3 = num/100;
+			if (num<100)
+				R3 = 11;
+			else
+				R3 = num/100;
 			flagDot[1] = 1;
 			break;
 		}
@@ -538,7 +594,7 @@ int main(void)
 
   HAL_TIM_Base_Start_IT(&htim6);
 
-
+  //LoadSetting();
   /* USER CODE END 2 */
 
   /* Infinite loop */
