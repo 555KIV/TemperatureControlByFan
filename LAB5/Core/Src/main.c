@@ -241,7 +241,7 @@ void LoadSetting()
 		address+=8;
 	}
 
-	targetTemp = (data[0]!=0)?data[0]:20;
+	targetTemp = (data[0]!=0)?((float)data[0]/10):20;
 	targetTempEncoder = targetTemp;
 	Kp = (data[1]!=0)?data[1]:50;
 	Ki = (data[2]!=0)?data[2]:0;
@@ -263,7 +263,7 @@ void SaveSetting()
 
 
 	uint32_t address = flashAddress;
-	uint64_t data[NUM_SETTING] = {targetTemp,Kp,Ki,Kd};
+	uint64_t data[NUM_SETTING] = {targetTemp*10,Kp,Ki,Kd};
 
 	//address +=4;
 
@@ -541,7 +541,7 @@ void Encoder()
 			}
 			if (flagMenuEditPID == 1)
 			{
-				KEncoder = (KEncoder <= -99) ? -99 : KEncoder-1;
+				KEncoder = (KEncoder <= 0) ? 0 : KEncoder-1;
 				return;
 			}
 			posMenu = posMenu <= MENU_POS_MIN ? MENU_POS_MIN : posMenu-1;
