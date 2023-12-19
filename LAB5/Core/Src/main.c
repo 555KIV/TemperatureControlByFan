@@ -60,7 +60,6 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim14;
-TIM_HandleTypeDef htim17;
 
 /* USER CODE BEGIN PV */
 
@@ -75,7 +74,6 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM14_Init(void);
-static void MX_TIM17_Init(void);
 /* USER CODE BEGIN PFP */
 void LedPrint();
 /* USER CODE END PFP */
@@ -167,12 +165,9 @@ void TempMeasure()
 	HAL_ADC_Start_IT(&hadc1);
 	buf = ADC_raw[0];
 	buf = Filter_Sma(ADC_raw[0]);
-	//buf = Filter_RAA(ADC_raw[0]);
 	temp = A*buf*buf;
 	temp+= B*buf;
 	temp-= C;
-	temp*=10;
-	//LedPrint((uint8_t)temp);
 
 	sch_100ms = 0;
 
@@ -182,7 +177,7 @@ void FanPIDRegulator()
 {
 	float timeCountSec = (float)timeCountMs / 1000;
 
-	errCur = (temp/10) - targetTemp;
+	errCur = temp - targetTemp;
 
 	if ( (((Ki*errInteg)<=PID_FAN_CYCLE_MAX) && (errCur >=0)) || (((Ki*errInteg)>=PID_FAN_CYCLE_MIN) && (errCur < 0)) )
 	{
@@ -203,7 +198,6 @@ void FanPIDRegulator()
 		pwmFAN = PID_FAN_CYCLE_MAX;
 	}
 
-	//TIM14->CCR1 = pwmFAN;
 	TIM14->CCR1 = (uint16_t)pwmFAN;
 	errPrev = errCur;
 	timeCountMs = 0;
@@ -252,7 +246,6 @@ void SaveSetting()
 {
 	static FLASH_EraseInitTypeDef EraseInitStruct;
 	EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
-	//EraseInitStruct.Page = flashAddress;
 	EraseInitStruct.Page = FLASH_PAGE_NB-1;
 	EraseInitStruct.NbPages = 1;
 	uint32_t pageErr = 0;
@@ -261,11 +254,8 @@ void SaveSetting()
 
 	HAL_FLASHEx_Erase(&EraseInitStruct, &pageErr);
 
-
 	uint32_t address = flashAddress;
 	uint64_t data[NUM_SETTING] = {targetTemp*10,Kp,Ki,Kd};
-
-	//address +=4;
 
 	for(uint16_t i = 0;i<NUM_SETTING;i++)
 	{
@@ -275,7 +265,6 @@ void SaveSetting()
 	}
 
 	HAL_FLASH_Lock();
-
 
 }
 
@@ -332,7 +321,6 @@ void EnterButton()
 		{
 			flagMenuEditHidden = 0;
 			flagMenuEdit = 1;
-			//HAL_TIM_Base_Start_IT(&htim17);
 
 		}
 		return;
@@ -340,7 +328,6 @@ void EnterButton()
 	if (flagMenuEditPID == 1)
 	{
 		ApplyPIDSetting();
-		//HAL_TIM_Base_Stop_IT(&htim17);
 		flagMenuEdit = 0;
 		flagMenuEditHidden = 0;
 		flagMenuEditPID = 0;
@@ -359,7 +346,6 @@ void EnterButton()
 		}
 		case 3:
 		{
-			//HAL_TIM_Base_Stop_IT(&htim17);
 			flagMenuEdit = 0;
 			flagMenuEditHidden = 0;
 			flagMenu = 1;
@@ -369,7 +355,6 @@ void EnterButton()
 		case 4:
 		{
 			RecordKEncoder();
-			//HAL_TIM_Base_Start_IT(&htim17);
 			flagMenuEdit = 1;
 			flagMenuEditPID = 1;
 			break;
@@ -438,7 +423,7 @@ void LedPrint()
 	{
 		case 1:
 		{
-			uint16_t num = temp;
+			uint16_t num = temp*10;
 			R1 = num%10;
 			R2 = (num%100)/10;
 			if (num<100)
@@ -586,7 +571,6 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM6_Init();
   MX_TIM14_Init();
-  MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADCEx_Calibration_Start(&hadc1);
 
@@ -605,8 +589,6 @@ int main(void)
   HAL_GPIO_WritePin(GPIOC,HL_Switch1_Pin|HL_Switch2_Pin|HL_Switch3_Pin,GPIO_PIN_RESET);
 
   HAL_TIM_Base_Start_IT(&htim6);
-
-  //HAL_TIM_Base_Start_IT(&htim17);
 
   LoadSetting();
 
@@ -908,38 +890,6 @@ static void MX_TIM14_Init(void)
 
   /* USER CODE END TIM14_Init 2 */
   HAL_TIM_MspPostInit(&htim14);
-
-}
-
-/**
-  * @brief TIM17 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM17_Init(void)
-{
-
-  /* USER CODE BEGIN TIM17_Init 0 */
-
-  /* USER CODE END TIM17_Init 0 */
-
-  /* USER CODE BEGIN TIM17_Init 1 */
-
-  /* USER CODE END TIM17_Init 1 */
-  htim17.Instance = TIM17;
-  htim17.Init.Prescaler = 16000-1;
-  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 1000;
-  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim17.Init.RepetitionCounter = 0;
-  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM17_Init 2 */
-
-  /* USER CODE END TIM17_Init 2 */
 
 }
 
