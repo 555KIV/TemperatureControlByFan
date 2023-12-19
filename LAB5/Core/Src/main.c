@@ -86,8 +86,8 @@ void LedPrint();
 
 //---------------------------
 float pwmFAN = 100;
-float targetTemp = 15;
-float targetTempEncoder = 15;
+float targetTemp = 20;
+float targetTempEncoder = 20;
 
 float Kp = 50;
 float Ki = 0;
@@ -144,8 +144,11 @@ uint8_t posMenu = 1;
 uint8_t posMenuPID_Edit = 1;
 uint8_t flagMenu = 0;
 uint8_t flagMenuEditHidden = 0;
+uint8_t flagMenuEdit = 0;
 uint8_t flagMenuEditPID = 0;
 uint8_t flagDot[3] = {0,0,0};
+
+uint32_t counthidden = 0;
 
 
 
@@ -235,10 +238,11 @@ void LoadSetting()
 		{
 			data[i] = buf;
 		}
-		address+=4;
+		address+=8;
 	}
 
 	targetTemp = (data[0]!=0)?data[0]:20;
+	targetTempEncoder = targetTemp;
 	Kp = (data[1]!=0)?data[1]:50;
 	Ki = (data[2]!=0)?data[2]:0;
 	Kd = (data[3]!=0)?data[3]:0;
@@ -259,13 +263,15 @@ void SaveSetting()
 
 
 	uint32_t address = flashAddress;
-	uint32_t data[NUM_SETTING] = {targetTemp,Kp,Ki,Kd};
+	uint64_t data[NUM_SETTING] = {targetTemp,Kp,Ki,Kd};
+
+	//address +=4;
 
 	for(uint16_t i = 0;i<NUM_SETTING;i++)
 	{
-		HAL_FLASH_Program(FLASH_TYPEPROGRAM_FAST,address, data[i]);
+		HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address, data[i]);
 
-		address +=4;
+		address +=8;
 	}
 
 	HAL_FLASH_Lock();
@@ -325,15 +331,19 @@ void EnterButton()
 		if (posMenu == 3)
 		{
 			flagMenuEditHidden = 0;
-			HAL_TIM_Base_Start_IT(&htim17);
+			flagMenuEdit = 1;
+			//HAL_TIM_Base_Start_IT(&htim17);
+
 		}
 		return;
 	}
 	if (flagMenuEditPID == 1)
 	{
 		ApplyPIDSetting();
-		HAL_TIM_Base_Stop_IT(&htim17);
+		//HAL_TIM_Base_Stop_IT(&htim17);
+		flagMenuEdit = 0;
 		flagMenuEditHidden = 0;
+		flagMenuEditPID = 0;
 		flagMenu = 1;
 		return;
 	}
@@ -349,7 +359,8 @@ void EnterButton()
 		}
 		case 3:
 		{
-			HAL_TIM_Base_Stop_IT(&htim17);
+			//HAL_TIM_Base_Stop_IT(&htim17);
+			flagMenuEdit = 0;
 			flagMenuEditHidden = 0;
 			flagMenu = 1;
 			targetTemp = targetTempEncoder;
@@ -358,13 +369,14 @@ void EnterButton()
 		case 4:
 		{
 			RecordKEncoder();
-			HAL_TIM_Base_Start_IT(&htim17);
+			//HAL_TIM_Base_Start_IT(&htim17);
+			flagMenuEdit = 1;
 			flagMenuEditPID = 1;
 			break;
 		}
 		case 5:
 		{
-			//SaveSetting();
+			SaveSetting();
 			flagMenu = 1;
 		}
 	}
@@ -503,7 +515,7 @@ void Encoder()
 				targetTempEncoder = (targetTempEncoder >= 99.9) ? 99.9 : targetTempEncoder+0.1;
 				return;
 			}
-			if (flagMenu == 0 && posMenu == 4)
+			if (flagMenu == 0 && posMenu == 4 && flagMenuEditPID == 0)
 			{
 				posMenuPID_Edit = (posMenuPID_Edit >= 3) ? 3 : posMenuPID_Edit+1;
 				return;
@@ -522,7 +534,7 @@ void Encoder()
 				targetTempEncoder = (targetTempEncoder <= 0) ? 0 : targetTempEncoder-0.1;
 				return;
 			}
-			if (flagMenu == 0 && posMenu == 4)
+			if (flagMenu == 0 && posMenu == 4 && flagMenuEditPID == 0)
 			{
 				posMenuPID_Edit = (posMenuPID_Edit <= 1) ? 1 : posMenuPID_Edit-1;
 				return;
@@ -594,7 +606,11 @@ int main(void)
 
   HAL_TIM_Base_Start_IT(&htim6);
 
-  //LoadSetting();
+  //HAL_TIM_Base_Start_IT(&htim17);
+
+  LoadSetting();
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -913,7 +929,7 @@ static void MX_TIM17_Init(void)
   htim17.Instance = TIM17;
   htim17.Init.Prescaler = 16000-1;
   htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim17.Init.Period = 65535;
+  htim17.Init.Period = 1000;
   htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim17.Init.RepetitionCounter = 0;
   htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -1017,6 +1033,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		TIM14->CCR1 = (uint16_t)pwmFAN;
 		++timeCountMs;
+	}
+	if (htim->Instance == TIM17)
+	{
+		flagMenuEditHidden = (flagMenuEditHidden == 0)? 1: 0;
 	}
 }
 

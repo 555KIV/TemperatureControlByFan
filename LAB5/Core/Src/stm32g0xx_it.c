@@ -69,6 +69,8 @@ volatile static uint32_t lastPress = 0;
 extern uint8_t flagMenu;
 extern uint8_t flagMenuEditHidden;
 uint8_t n_count = 0;
+extern uint32_t counthidden;
+extern uint8_t flagMenuEdit;
 
 
 
@@ -264,6 +266,15 @@ void TIM6_DAC_LPTIM1_IRQHandler(void)
 	}
 	n_count++;
 	if (n_count>2) n_count=0;
+	if ( flagMenuEdit == 1)
+	{
+		counthidden++;
+		if (counthidden == 75)
+		{
+			flagMenuEditHidden = (flagMenuEditHidden == 0)? 1: 0;
+			counthidden = 0;
+		}
+	}
   /* USER CODE END TIM6_DAC_LPTIM1_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_LPTIM1_IRQn 1 */
@@ -291,7 +302,7 @@ void TIM14_IRQHandler(void)
 void TIM17_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM17_IRQn 0 */
-	flagMenuEditHidden = !flagMenuEditHidden;
+	flagMenuEditHidden = (flagMenuEditHidden == 0)? 1: 0;
   /* USER CODE END TIM17_IRQn 0 */
   HAL_TIM_IRQHandler(&htim17);
   /* USER CODE BEGIN TIM17_IRQn 1 */
