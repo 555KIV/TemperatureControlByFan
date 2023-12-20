@@ -70,6 +70,8 @@ extern uint8_t flagMenuEditHidden;
 uint8_t n_count = 0;
 extern uint32_t counthidden;
 extern uint8_t flagMenuEdit;
+extern float pwmFAN;
+extern uint32_t timeCountMs;
 
 
 
@@ -287,7 +289,8 @@ void TIM6_DAC_LPTIM1_IRQHandler(void)
 void TIM14_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM14_IRQn 0 */
-
+	TIM14->CCR1 = (uint16_t)pwmFAN;
+	++timeCountMs;
   /* USER CODE END TIM14_IRQn 0 */
   HAL_TIM_IRQHandler(&htim14);
   /* USER CODE BEGIN TIM14_IRQn 1 */

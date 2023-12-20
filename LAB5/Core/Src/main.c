@@ -198,7 +198,7 @@ void FanPIDRegulator()
 		pwmFAN = PID_FAN_CYCLE_MAX;
 	}
 
-	TIM14->CCR1 = (uint16_t)pwmFAN;
+	//TIM14->CCR1 = (uint16_t)pwmFAN;
 	errPrev = errCur;
 	timeCountMs = 0;
 
@@ -233,6 +233,7 @@ void LoadSetting()
 			data[i] = buf;
 		}
 		address+=8;
+		//address+=4;
 	}
 
 	targetTemp = (data[0]!=0)?((float)data[0]/10):20;
@@ -255,11 +256,15 @@ void SaveSetting()
 	HAL_FLASHEx_Erase(&EraseInitStruct, &pageErr);
 
 	uint32_t address = flashAddress;
-	uint64_t data[NUM_SETTING] = {targetTemp*10,Kp,Ki,Kd};
+	//uint64_t data[NUM_SETTING] = {targetTemp*10,Kp,Ki,Kd};
+
+	uint32_t data[NUM_SETTING] = {targetTemp*10,Kp,Ki,Kd};
 
 	for(uint16_t i = 0;i<NUM_SETTING;i++)
 	{
+		//uint64_t buf = (data[i*2] + (data[i*2+1]<<32));
 		HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address, data[i]);
+		//HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address, buf);
 
 		address +=8;
 	}
@@ -984,10 +989,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		TIM14->CCR1 = (uint16_t)pwmFAN;
 		++timeCountMs;
 	}
-	if (htim->Instance == TIM17)
-	{
-		flagMenuEditHidden = (flagMenuEditHidden == 0)? 1: 0;
-	}
+
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
